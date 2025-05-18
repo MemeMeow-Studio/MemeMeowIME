@@ -6,6 +6,7 @@
 # 特性
 - 一键启动：快捷键呼出，数字键/点击复制表情包
 - 前后端分离：表情包服务器与表情包软件分离，基于Tauri2的极简软件大小
+- 配合[MemeMeow](https://github.com/MemeMeow-Studio/MemeMeow)，可以支持更多表情包，未来将支持以类似创意工坊的方式选择表情包组
 - 跨平台：支持Windows/MacOS/Linux, 未来将适配手机
 
 # 使用方法
