@@ -81,7 +81,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
 // 改进选择表情处理，增加错误恢复和用户反馈
 const selectMeme = async (meme: MemeItem) => {
   try {
-    const originalErrorMessage = errorMessage.value;
+    // const originalErrorMessage = errorMessage.value;
     errorMessage.value = '';
     
     // 显示一个临时的选择指示器
