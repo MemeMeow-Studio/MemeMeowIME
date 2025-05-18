@@ -13,6 +13,10 @@ use meme_server::{MemeItem, MemeServerClient, MemeServerConfig};
 mod config_manager;
 use config_manager::{ConfigManager, ShortcutConfigs, UserPreferences};
 
+// 导入系统托盘模块
+mod sys_tray;
+use sys_tray::create_system_tray;
+
 // 创建一个全局静态HTTP客户端，确保只初始化一次
 static MEME_CLIENT: OnceLock<MemeServerClient> = OnceLock::new();
 // 创建一个全局静态配置管理器
@@ -134,7 +138,7 @@ async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Re
     Ok(())
 }
 
-// 修改 run 函数以使用配置的快捷键
+// 修改 run 函数以使用配置的快捷键并添加系统托盘
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -213,6 +217,13 @@ pub fn run() {
 
                 // 注册快捷键
                 register_app_shortcuts(app, config_manager);
+                
+                // 初始化系统托盘
+                if let Err(e) = create_system_tray(app) {
+                    error!("创建系统托盘失败: {}", e);
+                } else {
+                    info!("系统托盘创建成功");
+                }
             }
             Ok(())
         })
