@@ -90,6 +90,7 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+          prerelease: true
 
   publish-release:
     permissions:
