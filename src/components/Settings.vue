@@ -48,14 +48,15 @@ onMounted(async () => {
   try {
     isLoading.value = true;
     // 从后端加载用户偏好设置
-    const userPrefs = await invoke('get_user_preferences');
+    const userPrefs = await invoke('get_user_preferences') as { copy_to_clipboard: boolean };
+    
     // 合并已存在的设置
     if (userPrefs) {
       // 将后端的蛇形命名转换为前端的驼峰命名
       preferences.copyToClipboard = userPrefs.copy_to_clipboard;
       
       // 获取当前快捷键配置
-      const shortcuts = await invoke('get_shortcuts');
+      const shortcuts = await invoke('get_shortcuts') as { toggle_app: ShortcutConfig };
       if (shortcuts) {
         preferences.shortcuts.toggleApp = shortcuts.toggle_app;
       }
