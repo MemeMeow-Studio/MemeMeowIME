@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onErrorCaptured, watch } from 'vue';
+import { ref, onMounted, onErrorCaptured } from 'vue';
 import MemeSelector from './components/MemeSelector.vue';
 import Settings from './components/Settings.vue';
 import { listen } from '@tauri-apps/api/event';
 
-const selectedMeme = ref<{ id: string; url: string; description?: string } | null>(null);
-const showSettings = ref(false);
+const activeTab = ref('memes'); // 默认显示表情选择器
 const notification = ref<{ type: 'error' | 'success', message: string } | null>(null);
 const fatalError = ref<string | null>(null);
 
@@ -38,7 +37,7 @@ window.addEventListener('error', (event) => {
 // Handle meme selection
 onMounted(() => {
   window.addEventListener('meme-selected', ((event: CustomEvent) => {
-    selectedMeme.value = event.detail;
+    // selectedMeme.value = event.detail;
   }) as EventListener);
   
   // 监听快捷键注册失败事件
@@ -59,18 +58,14 @@ onMounted(() => {
   }, 5000);
 });
 
-// 监听selectedMeme变化，3秒后自动清除
-watch(selectedMeme, (val) => {
-  if (val) {
-    setTimeout(() => {
-      selectedMeme.value = null;
-    }, 3000);
-  }
-});
-
-const toggleSettings = () => {
-  showSettings.value = !showSettings.value;
+// 切换活动标签页
+const switchTab = (tab: string) => {
+  activeTab.value = tab;
 };
+
+// const toggleSettings = () => {
+//   showSettings.value = !showSettings.value;
+// };
 
 const showNotification = (type: 'error' | 'success', message: string) => {
   notification.value = { type, message };
@@ -102,37 +97,35 @@ const resetApp = () => {
         <button class="close-button" @click="notification = null">×</button>
       </div>
       
+      <!-- 新的标签式导航栏 -->
       <header class="app-header">
         <h1>Meme Input</h1>
-        <button class="settings-button" @click="toggleSettings">
-          <span v-if="showSettings">返回</span>
-          <span v-else>设置</span>
-        </button>
+        <div class="tabs-container">
+          <div 
+            class="tab" 
+            :class="{ active: activeTab === 'memes' }" 
+            @click="switchTab('memes')"
+          >
+            表情浏览
+          </div>
+          <div 
+            class="tab" 
+            :class="{ active: activeTab === 'settings' }" 
+            @click="switchTab('settings')"
+          >
+            系统设置
+          </div>
+        </div>
       </header>
       
-      <div v-if="!showSettings">
-        <div v-if="selectedMeme" class="selected-meme">
-          <h2>Selected Meme</h2>
-          <img :src="selectedMeme.url" :alt="selectedMeme.description || 'Selected meme'" />
-          <p>The image has been copied to your clipboard!</p>
-          <p>You can now paste it into any application.</p>
+      <!-- 标签内容区域 -->
+      <div class="tab-content">
+        <div v-if="activeTab === 'memes'">
+          <MemeSelector />
         </div>
         
-        <MemeSelector />
-        
-        <div class="instructions">
-          <h3>Instructions:</h3>
-          <ol>
-            <li>Type keywords in the search box and press Enter</li>
-            <li>Browse through the meme results</li>
-            <li>Press number keys (1-9) to select a meme</li>
-            <li>The selected meme will be copied to your clipboard</li>
-            <li>Paste the meme into any application!</li>
-          </ol>
-        </div>
+        <Settings v-if="activeTab === 'settings'" />
       </div>
-      
-      <Settings v-if="showSettings" />
     </div>
   </div>
 </template>
@@ -166,22 +159,41 @@ body {
 
 .app-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
   margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
 }
 
-.settings-button {
-  padding: 0.5rem 1rem;
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+/* 标签导航样式 */
+.tabs-container {
+  display: flex;
+  width: 100%;
+  margin-top: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tab {
+  padding: 0.75rem 1.5rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
 }
 
-.settings-button:hover {
-  background-color: #e0e0e0;
+.tab:hover {
+  background-color: #f5f5f5;
+}
+
+.tab.active {
+  color: #4a8fe7;
+  border-bottom: 2px solid #4a8fe7;
+}
+
+/* 标签内容区域 */
+.tab-content {
+  padding: 1rem 0;
 }
 
 .container {

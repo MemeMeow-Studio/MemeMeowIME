@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { UnlistenFn } from '@tauri-apps/api/event';
 
 interface MemeItem {
   id: string;
@@ -21,6 +19,8 @@ const errorMessage = ref('');
 const preferences = ref<UserPreferences>({
   copy_to_clipboard: true
 });
+// 添加选中表情的状态
+const selectedMeme = ref<MemeItem | null>(null);
 
 // Load user preferences
 onMounted(async () => {
@@ -28,6 +28,15 @@ onMounted(async () => {
     preferences.value = await invoke('get_user_preferences');
   } catch (error) {
     console.error('Failed to load preferences:', error);
+  }
+});
+
+// 监听selectedMeme变化，3秒后自动清除
+watch(selectedMeme, (val) => {
+  if (val) {
+    setTimeout(() => {
+      selectedMeme.value = null;
+    }, 3000);
   }
 });
 
@@ -114,6 +123,9 @@ const selectMeme = async (meme: MemeItem) => {
       document.body.removeChild(tempStatus);
     }, 2000);
     
+    // 设置选中的表情
+    selectedMeme.value = meme;
+    
     // Emit a custom event to notify parent components about the selection
     const event = new CustomEvent('meme-selected', { detail: meme });
     window.dispatchEvent(event);
@@ -129,63 +141,15 @@ const selectMeme = async (meme: MemeItem) => {
 };
 
 // Setup keyboard listeners
-let unlisten: UnlistenFn | null = null;
 
 onMounted(async () => {
   // Add keyboard event listener for number keys
   window.addEventListener('keydown', handleKeyPress);
-  
-  // Listen for clipboard events from Rust
-  unlisten = await listen('copy-image-to-clipboard', async (event) => {
-    try {
-      const imageUrl = event.payload as string;
-      
-      // Create a temporary image element to handle the copying
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = imageUrl;
-      
-      // Wait for the image to load
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-      
-      // Create a canvas to draw the image
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      
-      // Draw the image on the canvas
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Failed to get canvas context');
-      ctx.drawImage(img, 0, 0);
-      
-      // Get the image as a blob
-      const blob = await new Promise<Blob | null>((resolve) => 
-        canvas.toBlob(resolve, 'image/png')
-      );
-      
-      if (!blob) throw new Error('Failed to convert image to blob');
-      
-      // Copy to clipboard
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'image/png': blob
-        })
-      ]);
-      
-      console.log('Image copied to clipboard');
-    } catch (error) {
-      console.error('Clipboard operation failed:', error);
-    }
-  });
 });
 
 onUnmounted(() => {
   // Clean up event listeners
   window.removeEventListener('keydown', handleKeyPress);
-  if (unlisten) unlisten();
 });
 
 // Toggle clipboard functionality
@@ -203,11 +167,19 @@ const toggleClipboard = async () => {
 
 <template>
   <div class="meme-selector">
+    <!-- 添加选中表情的展示部分 -->
+    <div v-if="selectedMeme" class="selected-meme">
+      <h2>已选择的表情</h2>
+      <img :src="selectedMeme.url" :alt="selectedMeme.description || '已选择的表情'" />
+      <p>图片已复制到剪贴板！</p>
+      <p>现在您可以将其粘贴到任何应用程序中。</p>
+    </div>
+    
     <div class="search-container">
       <input 
         v-model="searchText"
         @keydown.enter="searchMemes"
-        placeholder="Search for memes..."
+        placeholder="🔍搜索表情包"
         type="text"
       />
       <button @click="searchMemes" :disabled="isLoading">
@@ -222,7 +194,7 @@ const toggleClipboard = async () => {
           :checked="preferences.copy_to_clipboard"
           @change="toggleClipboard"
         />
-        Copy to clipboard when selected
+        复制到剪贴板📋
       </label>
     </div>
     
@@ -241,6 +213,18 @@ const toggleClipboard = async () => {
         <div class="meme-number">{{ index + 1 }}</div>
         <img :src="meme.url" :alt="meme.description || 'Meme image'" />
       </div>
+    </div>
+    
+    <!-- 添加使用说明 -->
+    <div class="instructions">
+      <h3>使用说明：</h3>
+      <ol>
+        <li>在搜索框中输入关键词并按下回车</li>
+        <li>浏览表情搜索结果</li>
+        <li>按数字键（1-9）选择表情</li>
+        <li>所选表情将被复制到剪贴板</li>
+        <li>将表情粘贴到任何应用程序中！</li>
+      </ol>
     </div>
   </div>
 </template>
@@ -314,7 +298,7 @@ const toggleClipboard = async () => {
 .meme-grid {
   display: grid;
   /* grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); */
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
@@ -378,5 +362,31 @@ const toggleClipboard = async () => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* 添加选中表情的样式 */
+.selected-meme {
+  margin: 2rem 0;
+  padding: 1rem;
+  background-color: #f0f8ff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.selected-meme img {
+  max-width: 300px;
+  max-height: 300px;
+  margin: 1rem auto;
+  display: block;
+}
+
+/* 添加使用说明样式 */
+.instructions {
+  text-align: left;
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f5f5f5;
+  border-radius: 8px;
 }
 </style>

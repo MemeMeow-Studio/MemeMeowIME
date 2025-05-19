@@ -1,9 +1,9 @@
+use log::{debug, error, info};
 use serde::{de, Deserialize, Serialize};
 use std::fs::{self, File};
-use std::path::PathBuf;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use log::{debug, error, info};
 use tauri_plugin_global_shortcut::{Code, Modifiers};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -72,7 +72,7 @@ impl ShortcutConfig {
                 _ => continue,
             }
         }
-        
+
         // 将字符串键转换为Tauri Code
         let code = match self.key.to_lowercase().as_str() {
             "a" => Code::KeyA,
@@ -128,7 +128,7 @@ impl ShortcutConfig {
             // 默认键
             _ => Code::KeyV, // 默认使用V键
         };
-        
+
         (modifiers, code)
     }
 }
@@ -144,31 +144,31 @@ impl ConfigManager {
         let config_dir = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(app_name);
-        
+
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir)?;
         }
 
         debug!("配置目录: {:?}", config_dir);
-        
+
         let config_path = config_dir.join("preferences.json");
         let preferences = match Self::load_preferences(&config_path) {
             Ok(prefs) => {
                 info!("加载用户配置成功");
                 prefs
-            },
+            }
             Err(err) => {
                 error!("加载用户配置失败: {}，将使用默认配置", err);
                 UserPreferences::default()
             }
         };
-        
+
         Ok(Self {
             path: config_path,
             preferences: Arc::new(Mutex::new(preferences)),
         })
     }
-    
+
     // 加载偏好设置
     fn load_preferences(path: &PathBuf) -> Result<UserPreferences, io::Error> {
         if !path.exists() {
@@ -179,11 +179,11 @@ impl ConfigManager {
             file.write_all(json.as_bytes())?;
             return Ok(default_prefs);
         }
-        
+
         let mut file = File::open(path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        
+
         match serde_json::from_str(&contents) {
             Ok(prefs) => Ok(prefs),
             Err(err) => {
@@ -192,7 +192,7 @@ impl ConfigManager {
             }
         }
     }
-    
+
     // 保存偏好设置
     fn save_preferences(&self) -> Result<(), io::Error> {
         let prefs = match self.preferences.try_lock() {
@@ -202,7 +202,7 @@ impl ConfigManager {
                 return Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"));
             }
         };
-        
+
         let json = serde_json::to_string_pretty(&prefs)?;
         let mut file = File::create(&self.path)?;
         file.write_all(json.as_bytes())?;
@@ -217,7 +217,7 @@ impl ConfigManager {
         debug!("配置已保存到: {:?}", self.path);
         Ok(())
     }
-    
+
     // 获取偏好设置
     pub fn get_preferences(&self) -> Result<UserPreferences, io::Error> {
         debug!("尝试获取偏好设置锁");
@@ -232,14 +232,14 @@ impl ConfigManager {
             }
         }
     }
-    
+
     // 更新偏好设置
     pub fn update_preferences(&self, new_prefs: UserPreferences) -> Result<(), io::Error> {
         match self.preferences.try_lock() {
             Ok(mut guard) => {
                 *guard = new_prefs;
                 self.save_preferences()
-            },
+            }
             Err(err) => {
                 error!("获取偏好锁失败: {}", err);
                 // 新增调试信息
@@ -248,7 +248,7 @@ impl ConfigManager {
             }
         }
     }
-    
+
     // 更新剪贴板设置
     pub fn update_clipboard_setting(&self, enabled: bool) -> Result<(), io::Error> {
         debug!("尝试更新剪贴板设置 a");
@@ -258,28 +258,28 @@ impl ConfigManager {
                 guard.copy_to_clipboard = enabled;
                 debug!("剪贴板设置已更新: {}", enabled);
                 self.save_preferences_locked(&guard.clone())
-            },
+            }
             Err(err) => {
                 error!("获取偏好锁失败: {}", err);
                 Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
             }
         }
     }
-    
+
     // 更新快捷键设置
     pub fn update_shortcuts(&self, shortcuts: ShortcutConfigs) -> Result<(), io::Error> {
         match self.preferences.lock() {
             Ok(mut guard) => {
                 guard.shortcuts = shortcuts;
                 self.save_preferences_locked(&guard.clone())
-            },
+            }
             Err(err) => {
                 error!("获取偏好锁失败: {}", err);
                 Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
             }
         }
     }
-    
+
     // 获取快捷键配置
     pub fn get_shortcuts(&self) -> Result<ShortcutConfigs, io::Error> {
         match self.preferences.lock() {
@@ -290,7 +290,7 @@ impl ConfigManager {
             }
         }
     }
-    
+
     // 获取应用切换快捷键
     pub fn get_toggle_app_shortcut(&self) -> Result<(Modifiers, Code), io::Error> {
         match self.preferences.lock() {

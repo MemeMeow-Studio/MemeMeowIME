@@ -1,6 +1,6 @@
 use log::info;
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder, IsMenuItem},
+    menu::{IsMenuItem, MenuBuilder, MenuItemBuilder},
     tray::{TrayIcon, TrayIconBuilder},
     Manager,
 };
@@ -15,9 +15,7 @@ pub fn create_system_tray(app: &tauri::App) -> Result<TrayIcon, tauri::Error> {
     let items: [&dyn IsMenuItem<_>; 1] = [&exit_item];
 
     // 使用 MenuBuilder 创建菜单并添加菜单项
-    let menu = MenuBuilder::new(app.handle())
-        .items(&items)
-        .build()?;
+    let menu = MenuBuilder::new(app.handle()).items(&items).build()?;
 
     // 构建系统托盘
     TrayIconBuilder::new()

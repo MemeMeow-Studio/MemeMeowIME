@@ -13,6 +13,7 @@
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
     "core:app:allow-app-hide",
-    "core:app:allow-app-show"
+    "core:app:allow-app-show",
+    "window-state:default"
   ]
 }

@@ -1,9 +1,14 @@
 use log::error;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use base64;
 use log::{debug, info};
 use std::sync::OnceLock;
+use tauri::image::Image;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_http::reqwest;
 
 // 导入表情包服务模块
 mod meme_server;
@@ -130,10 +135,28 @@ async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Re
         return Ok(());
     }
 
-    // 发送事件让前端处理剪贴板操作
-    if let Err(e) = window.emit("copy-image-to-clipboard", image_url) {
-        return Err(format!("Failed to emit clipboard event: {}", e));
-    }
+    // 下载图片数据
+    let response = reqwest::get(&image_url).await.map_err(|e| e.to_string())?;
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+
+    // 将图片数据编码为 base64
+    // let base64_image = base64::encode(&bytes);
+
+    let image = Image::from_bytes(&bytes).unwrap();
+
+    // 获取剪贴板管理器
+    let clipboard = window.clipboard();
+
+    clipboard.write_image(&image).map_err(|e| e.to_string())?;
+    debug!("Image copied to clipboard successfully");
+    // // 发送事件让前端处理剪贴板操作
+    // // if let Err(e) = window.emit("copy-image-to-clipboard", image_url) {
+    // //     return Err(format!("Failed to emit clipboard event: {}", e));
+    // // }
+    // // 将图片数据写入剪贴板
+    // let mut clipboard = window.clipboard();
+    // // clipboard.write_image(bytes.to_vec()).map_err(|e| e.to_string())?;
+    // clipboard.write_image(bytes.to_vec()).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -142,8 +165,10 @@ async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Re
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin({
             #[cfg(desktop)]
             {
@@ -217,7 +242,7 @@ pub fn run() {
 
                 // 注册快捷键
                 register_app_shortcuts(app, config_manager);
-                
+
                 // 初始化系统托盘
                 if let Err(e) = create_system_tray(app) {
                     error!("创建系统托盘失败: {}", e);
@@ -225,6 +250,24 @@ pub fn run() {
                     info!("系统托盘创建成功");
                 }
             }
+            Ok(())
+        })
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--flag1", "--flag2"]),
+        ))
+        .setup(|app| {
+            // 获取自动启动管理器
+            let autostart_manager = app.autolaunch();
+            // 启用 autostart
+            let _ = autostart_manager.enable();
+            // 检查 enable 状态
+            println!(
+                "registered for autostart? {}",
+                autostart_manager.is_enabled().unwrap()
+            );
+            // 禁用 autostart
+            let _ = autostart_manager.disable();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -369,21 +412,4 @@ fn refresh_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
     {
         Ok(())
     }
-}
-
-use serde::{de, Deserialize};
-use std::collections::HashMap;
-use tauri_plugin_http::reqwest;
-use tauri_plugin_http::reqwest::Error;
-
-#[derive(Deserialize, Debug)]
-struct PostResponse {
-    args: HashMap<String, String>,
-    data: String,
-    files: HashMap<String, String>,
-    form: HashMap<String, String>,
-    headers: HashMap<String, String>,
-    json: Option<serde_json::Value>, // 根据你期望的json结构调整
-    origin: String,
-    url: String,
 }
