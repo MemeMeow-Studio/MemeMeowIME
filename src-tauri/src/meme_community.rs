@@ -1,10 +1,13 @@
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
+use tauri::utils::acl::manifest;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use tauri_plugin_http::reqwest;
 use tauri_plugin_http::reqwest::{Client, Error, Method, Request, RequestBuilder, StatusCode};
+
+use crate::utils::network::download_with_fallback_urls;
 
 // 定义manifest.json的数据结构
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,29 +53,20 @@ impl Default for EnabledMemeLibs {
 
 // 定义下载manifest的函数
 pub async fn download_community_manifest() -> Result<CommunityManifest, String> {
-    const MANIFEST_URL: &str = "https://github.com/MemeMeow-Studio/Memes-Community/raw/main/community_manifest.json";
+    const MANIFEST_URLS: [&str; 2] = 
+    ["https://github.com/MemeMeow-Studio/Memes-Community/raw/main/community_manifest.json",
+     "https://gitee.com/infstellar/Memes-Community/raw/main/community_manifest.json"];
     info!("开始下载社区表情库清单");
 
     // 下载manifest文件
-    let response = match reqwest::get(MANIFEST_URL).await {
-        Ok(resp) => resp,
+    let manifest_text = match download_with_fallback_urls(MANIFEST_URLS).await {
+        Ok(text) => {
+            debug!("下载社区表情库清单成功");
+            text
+        }
         Err(e) => {
             error!("下载社区表情库清单失败: {}", e);
             return Err(format!("下载失败: {}", e));
-        }
-    };
-
-    if !response.status().is_success() {
-        error!("下载社区表情库清单失败: 状态码 {}", response.status());
-        return Err(format!("下载失败: 状态码 {}", response.status()));
-    }
-
-    // 解析JSON
-    let manifest_text = match response.text().await {
-        Ok(text) => text,
-        Err(e) => {
-            error!("读取社区表情库清单内容失败: {}", e);
-            return Err(format!("读取内容失败: {}", e));
         }
     };
 

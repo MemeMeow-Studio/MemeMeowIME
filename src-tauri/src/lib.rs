@@ -9,6 +9,8 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_http::reqwest;
 
+// Import utils
+mod utils;
 // 导入表情包服务模块
 mod meme_server;
 use meme_server::{MemeItem, MemeServerClient, MemeServerConfig};
