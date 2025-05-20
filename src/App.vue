@@ -2,6 +2,7 @@
 import { ref, onMounted, onErrorCaptured } from 'vue';
 import MemeSelector from './components/MemeSelector.vue';
 import Settings from './components/Settings.vue';
+import MemeCommunity from './components/MemeCommunity.vue';
 import { listen } from '@tauri-apps/api/event';
 
 const activeTab = ref('memes'); // 默认显示表情选择器
@@ -110,6 +111,13 @@ const resetApp = () => {
           </div>
           <div 
             class="tab" 
+            :class="{ active: activeTab === 'community' }" 
+            @click="switchTab('community')"
+          >
+            社区库
+          </div>
+          <div 
+            class="tab" 
             :class="{ active: activeTab === 'settings' }" 
             @click="switchTab('settings')"
           >
@@ -123,6 +131,8 @@ const resetApp = () => {
         <div v-if="activeTab === 'memes'">
           <MemeSelector />
         </div>
+        
+        <MemeCommunity v-if="activeTab === 'community'" />
         
         <Settings v-if="activeTab === 'settings'" />
       </div>

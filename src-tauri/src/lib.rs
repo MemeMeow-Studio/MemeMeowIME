@@ -1,6 +1,5 @@
 use log::error;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use base64;
 use log::{debug, info};
 use std::sync::OnceLock;
 use tauri::image::Image;
@@ -21,6 +20,9 @@ use config_manager::{ConfigManager, ShortcutConfigs, UserPreferences};
 // 导入系统托盘模块
 mod sys_tray;
 use sys_tray::create_system_tray;
+
+// 导入社区表情包模块
+mod meme_community;
 
 // 创建一个全局静态HTTP客户端，确保只初始化一次
 static MEME_CLIENT: OnceLock<MemeServerClient> = OnceLock::new();
@@ -149,17 +151,10 @@ async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Re
 
     clipboard.write_image(&image).map_err(|e| e.to_string())?;
     debug!("Image copied to clipboard successfully");
-    // // 发送事件让前端处理剪贴板操作
-    // // if let Err(e) = window.emit("copy-image-to-clipboard", image_url) {
-    // //     return Err(format!("Failed to emit clipboard event: {}", e));
-    // // }
-    // // 将图片数据写入剪贴板
-    // let mut clipboard = window.clipboard();
-    // // clipboard.write_image(bytes.to_vec()).map_err(|e| e.to_string())?;
-    // clipboard.write_image(bytes.to_vec()).map_err(|e| e.to_string())?;
-
     Ok(())
 }
+
+
 
 // 修改 run 函数以使用配置的快捷键并添加系统托盘
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -278,7 +273,12 @@ pub fn run() {
             copy_image_to_clipboard,
             get_shortcuts,
             set_shortcuts,
-            refresh_shortcuts
+            refresh_shortcuts,
+            meme_community::fetch_community_manifest,
+            meme_community::refresh_community_manifest,
+            meme_community::get_enabled_meme_libs,
+            meme_community::enable_meme_lib,
+            meme_community::disable_meme_lib
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -365,7 +365,9 @@ fn refresh_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
         use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
         // 先清空当前注册的所有快捷键
-        app.global_shortcut().unregister_all();
+        if let Err(e) = app.global_shortcut().unregister_all() {
+            error!("注销所有快捷键失败: {}", e);
+        }
 
         // 从配置中重新注册快捷键
         if let Some(config_manager) = CONFIG_MANAGER.get() {
