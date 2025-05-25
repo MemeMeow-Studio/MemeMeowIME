@@ -75,17 +75,17 @@ const loadApiConfig = async () => {
 };
 
 // 保存API配置
-const saveApiConfig = async () => {
-  apiSaving.value = true;
-  try {
-    await invoke('update_api_url_config', { config: apiConfig.value });
-  } catch (err) {
-    console.error('保存API配置失败:', err);
-    error.value = `保存API配置失败: ${err}`;
-  } finally {
-    apiSaving.value = false;
-  }
-};
+// const saveApiConfig = async () => {
+//   apiSaving.value = true;
+//   try {
+//     await invoke('update_api_url_config', { config: apiConfig.value });
+//   } catch (err) {
+//     console.error('保存API配置失败:', err);
+//     error.value = `保存API配置失败: ${err}`;
+//   } finally {
+//     apiSaving.value = false;
+//   }
+// };
 
 // 添加新API
 const addNewApi = async () => {
