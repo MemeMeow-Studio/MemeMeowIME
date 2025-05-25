@@ -29,6 +29,8 @@ pub struct UserPreferences {
     pub copy_to_clipboard: bool,
     #[serde(default)]
     pub shortcuts: ShortcutConfigs,
+    #[serde(default)]
+    pub api_urls: ApiUrlConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -36,6 +38,20 @@ pub struct ShortcutConfigs {
     #[serde(default = "default_toggle_app_shortcut")]
     pub toggle_app: ShortcutConfig,
     // 可以添加更多快捷键配置
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiUrlConfig {
+    #[serde(default = "default_api_urls")]
+    pub urls: Vec<ApiUrl>,
+    #[serde(default = "default_active_api_index")]
+    pub active_index: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiUrl {
+    pub name: String,
+    pub url: String,
 }
 
 fn default_true() -> bool {
@@ -50,11 +66,34 @@ fn default_toggle_app_shortcut() -> ShortcutConfig {
     }
 }
 
+fn default_api_urls() -> Vec<ApiUrl> {
+    vec![
+        ApiUrl {
+            name: "默认API".to_string(),
+            url: "https://mememeow.morami.icu".to_string(),
+        }
+    ]
+}
+
+fn default_active_api_index() -> usize {
+    0
+}
+
+impl Default for ApiUrlConfig {
+    fn default() -> Self {
+        Self {
+            urls: default_api_urls(),
+            active_index: 0,
+        }
+    }
+}
+
 impl Default for UserPreferences {
     fn default() -> Self {
         Self {
             copy_to_clipboard: true,
             shortcuts: ShortcutConfigs::default(),
+            api_urls: ApiUrlConfig::default(),
         }
     }
 }
@@ -301,4 +340,114 @@ impl ConfigManager {
             }
         }
     }
+
+    // 获取当前活跃的API URL
+    pub fn get_active_api_url(&self) -> Result<String, io::Error> {
+        match self.preferences.try_lock() {
+            Ok(guard) => {
+                let config = &guard.api_urls;
+                if config.urls.is_empty() {
+                    return Ok("https://mememeow.morami.icu".to_string());
+                }
+                
+                let index = if config.active_index < config.urls.len() {
+                    config.active_index
+                } else {
+                    0
+                };
+                
+                Ok(config.urls[index].url.clone())
+            },
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
+
+    // 获取API URL配置
+    pub fn get_api_url_config(&self) -> Result<ApiUrlConfig, io::Error> {
+        match self.preferences.try_lock() {
+            Ok(guard) => Ok(guard.api_urls.clone()),
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
+
+    // 更新API URL配置
+    pub fn update_api_url_config(&self, config: ApiUrlConfig) -> Result<(), io::Error> {
+        match self.preferences.try_lock() {
+            Ok(mut guard) => {
+                guard.api_urls = config;
+                debug!("API URL配置已更新");
+                self.save_preferences_locked(&guard.clone())
+            },
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
+
+    // 设置活跃的API URL
+    pub fn set_active_api_url(&self, index: usize) -> Result<(), io::Error> {
+        match self.preferences.try_lock() {
+            Ok(mut guard) => {
+                if index < guard.api_urls.urls.len() {
+                    guard.api_urls.active_index = index;
+                    debug!("活跃API URL已更新为索引 {}", index);
+                    self.save_preferences_locked(&guard.clone())
+                } else {
+                    Err(io::Error::new(io::ErrorKind::InvalidInput, "API URL索引超出范围"))
+                }
+            },
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
+
+    // 添加API URL
+    pub fn add_api_url(&self, name: String, url: String) -> Result<(), io::Error> {
+        match self.preferences.try_lock() {
+            Ok(mut guard) => {
+                guard.api_urls.urls.push(ApiUrl { name, url });
+                debug!("已添加新的API URL");
+                self.save_preferences_locked(&guard.clone())
+            },
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
+
+    // 删除API URL
+    pub fn remove_api_url(&self, index: usize) -> Result<(), io::Error> {
+        match self.preferences.try_lock() {
+            Ok(mut guard) => {
+                if index < guard.api_urls.urls.len() {
+                    guard.api_urls.urls.remove(index);
+                    
+                    // 如果删除的是当前活跃的API，则将活跃索引重置为0
+                    if guard.api_urls.active_index >= guard.api_urls.urls.len() {
+                        guard.api_urls.active_index = 0;
+                    }
+                    
+                    debug!("已删除API URL，索引: {}", index);
+                    self.save_preferences_locked(&guard.clone())
+                } else {
+                    Err(io::Error::new(io::ErrorKind::InvalidInput, "API URL索引超出范围"))
+                }
+            },
+            Err(err) => {
+                error!("获取偏好锁失败: {}", err);
+                Err(io::Error::new(io::ErrorKind::Other, "获取偏好锁失败"))
+            }
+        }
+    }
 }
+

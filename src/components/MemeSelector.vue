@@ -106,7 +106,7 @@ const selectMeme = async (meme: MemeItem) => {
       setTimeout(() => {
         document.body.removeChild(tempStatus);
       }, 2000);
-    }, 10000); // 10秒超时
+    }, 20000); // 10秒超时
     
     // Copy to clipboard if enabled
     await invoke('copy_image_to_clipboard', { 

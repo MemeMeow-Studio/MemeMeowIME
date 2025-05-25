@@ -35,7 +35,7 @@ fn get_meme_client() -> &'static MemeServerClient {
     MEME_CLIENT.get_or_init(|| {
         // 在实际应用中，可能需要从配置文件读取这些值
         let config = MemeServerConfig {
-            api_url: "https://api.zvv.quest/search".to_string(),
+            api_url: "https://mememeow.morami.icu".to_string(),
             timeout_seconds: 10,
         };
         MemeServerClient::new(Some(config))
@@ -120,6 +120,7 @@ fn set_shortcuts(shortcuts: ShortcutConfigs) -> Result<(), String> {
     }
 }
 
+
 // 剪贴板功能
 #[tauri::command]
 async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Result<(), String> {
@@ -156,7 +157,31 @@ async fn copy_image_to_clipboard(image_url: String, window: tauri::Window) -> Re
     Ok(())
 }
 
+// 添加API URL配置的命令函数
+#[tauri::command]
+fn get_api_url_config() -> Result<config_manager::ApiUrlConfig, String> {
+    get_config_manager().get_api_url_config().map_err(|e| e.to_string())
+}
 
+#[tauri::command]
+fn update_api_url_config(config: config_manager::ApiUrlConfig) -> Result<(), String> {
+    get_config_manager().update_api_url_config(config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_api_url(name: String, url: String) -> Result<(), String> {
+    get_config_manager().add_api_url(name, url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_api_url(index: usize) -> Result<(), String> {
+    get_config_manager().remove_api_url(index).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_active_api_url(index: usize) -> Result<(), String> {
+    get_config_manager().set_active_api_url(index).map_err(|e| e.to_string())
+}
 
 // 修改 run 函数以使用配置的快捷键并添加系统托盘
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -276,6 +301,12 @@ pub fn run() {
             get_shortcuts,
             set_shortcuts,
             refresh_shortcuts,
+            // 添加API URL管理命令
+            get_api_url_config,
+            update_api_url_config,
+            add_api_url,
+            remove_api_url,
+            set_active_api_url,
             meme_community::fetch_community_manifest,
             meme_community::refresh_community_manifest,
             meme_community::get_enabled_meme_libs,

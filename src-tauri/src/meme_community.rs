@@ -18,8 +18,8 @@ pub struct CommunityManifest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommunityInfo {
-    pub resource_url: String,
-    pub update_url: String,
+    // pub resource_url: String,
+    // pub update_url: String,
     pub timestamp: u64,
 }
 
@@ -53,13 +53,20 @@ impl Default for EnabledMemeLibs {
 
 // 定义下载manifest的函数
 pub async fn download_community_manifest() -> Result<CommunityManifest, String> {
-    const MANIFEST_URLS: [&str; 2] = 
-    ["https://github.com/MemeMeow-Studio/Memes-Community/raw/main/community_manifest.json",
-     "https://gitee.com/infstellar/Memes-Community/raw/main/community_manifest.json"];
+    // const MANIFEST_URLS: [&str; 2] = 
+    // ["https://github.com/MemeMeow-Studio/Memes-Community/raw/main/community_manifest.json",
+    //  "https://gitee.com/infstellar/Memes-Community/raw/main/community_manifest.json"];
+    let manifest_url = match crate::get_config_manager().get_active_api_url() {
+            Ok(url) => url+"/libs_manifest",
+            Err(_) => {
+                // error!("错误：{_} 获取API URL失败，使用默认值");
+                panic!("获取API URL失败，使用默认值")
+            }, // 如果获取失败，则使用默认值
+        };
     info!("开始下载社区表情库清单");
 
     // 下载manifest文件
-    let manifest_text = match download_with_fallback_urls(MANIFEST_URLS).await {
+    let manifest_text = match download_with_fallback_urls([manifest_url]).await {
         Ok(text) => {
             debug!("下载社区表情库清单成功");
             text

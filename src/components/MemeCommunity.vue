@@ -3,8 +3,8 @@ import { ref, onMounted, reactive } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 
 interface CommunityInfo {
-  resource_url: string;
-  update_url: string;
+  // resource_url: string;
+  // update_url: string;
   timestamp: number;
 }
 
@@ -26,12 +26,32 @@ interface CommunityManifest {
   meme_libs: Record<string, MemeLib>;
 }
 
+interface ApiUrl {
+  name: string;
+  url: string;
+}
+
+interface ApiUrlConfig {
+  urls: ApiUrl[];
+  active_index: number;
+}
+
 const communityManifest = ref<CommunityManifest | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const refreshing = ref(false);
 const enabledLibs = ref<string[]>([]);
 const processingLibs = reactive(new Set<string>());
+
+// API URL管理
+const apiConfig = ref<ApiUrlConfig>({
+  urls: [{ name: "默认API", url: "https://mememeow.morami.icu" }],
+  active_index: 0
+});
+const showApiManager = ref(false);
+const newApiName = ref("");
+const newApiUrl = ref("");
+const apiSaving = ref(false);
 
 // 将时间戳转换为可读格式
 const formatDate = (timestamp: number): string => {
@@ -41,6 +61,77 @@ const formatDate = (timestamp: number): string => {
     month: 'long', 
     day: 'numeric'
   });
+};
+
+// 加载API配置
+const loadApiConfig = async () => {
+  try {
+    const config = await invoke<ApiUrlConfig>('get_api_url_config');
+    apiConfig.value = config;
+  } catch (err) {
+    console.error('加载API配置失败:', err);
+    error.value = `加载API配置失败: ${err}`;
+  }
+};
+
+// 保存API配置
+const saveApiConfig = async () => {
+  apiSaving.value = true;
+  try {
+    await invoke('update_api_url_config', { config: apiConfig.value });
+  } catch (err) {
+    console.error('保存API配置失败:', err);
+    error.value = `保存API配置失败: ${err}`;
+  } finally {
+    apiSaving.value = false;
+  }
+};
+
+// 添加新API
+const addNewApi = async () => {
+  if (!newApiName.value || !newApiUrl.value) {
+    error.value = "API名称和地址不能为空";
+    return;
+  }
+  
+  try {
+    await invoke('add_api_url', { 
+      name: newApiName.value, 
+      url: newApiUrl.value 
+    });
+    
+    // 重新加载配置
+    await loadApiConfig();
+    
+    // 清空输入
+    newApiName.value = "";
+    newApiUrl.value = "";
+  } catch (err) {
+    console.error('添加API失败:', err);
+    error.value = `添加API失败: ${err}`;
+  }
+};
+
+// 删除API
+const removeApi = async (index: number) => {
+  try {
+    await invoke('remove_api_url', { index });
+    await loadApiConfig();
+  } catch (err) {
+    console.error('删除API失败:', err);
+    error.value = `删除API失败: ${err}`;
+  }
+};
+
+// 设置活跃API
+const setActiveApi = async (index: number) => {
+  try {
+    await invoke('set_active_api_url', { index });
+    apiConfig.value.active_index = index;
+  } catch (err) {
+    console.error('设置活跃API失败:', err);
+    error.value = `设置活跃API失败: ${err}`;
+  }
 };
 
 // 加载社区表情库清单
@@ -123,8 +214,17 @@ const isLibEnabled = (libUuid: string): boolean => {
   return enabledLibs.value.includes(libUuid);
 };
 
+// 切换API管理器显示状态
+const toggleApiManager = () => {
+  showApiManager.value = !showApiManager.value;
+  if (showApiManager.value) {
+    loadApiConfig();
+  }
+};
+
 onMounted(() => {
   loadCommunityManifest();
+  loadApiConfig();
 });
 </script>
 
@@ -132,22 +232,83 @@ onMounted(() => {
   <div class="meme-community">
     <div class="header">
       <h2>表情包社区</h2>
-      <button 
-        class="refresh-button" 
-        @click="refreshManifest" 
-        :disabled="refreshing"
-      >
-        {{ refreshing ? '刷新中...' : '刷新' }}
-      </button>
+      <div class="header-buttons">
+        <button 
+          class="api-button" 
+          @click="toggleApiManager"
+        >
+          {{ showApiManager ? '关闭API管理' : 'API管理' }}
+        </button>
+        <button 
+          class="refresh-button" 
+          @click="refreshManifest" 
+          :disabled="refreshing"
+        >
+          {{ refreshing ? '刷新中...' : '刷新' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="error" class="error">
+      <p>{{ error }}</p>
+      <button @click="error = null">关闭</button>
+    </div>
+
+    <!-- API管理界面 -->
+    <div v-if="showApiManager" class="api-manager">
+      <h3>管理API地址</h3>
+      
+      <div class="api-list">
+        <div v-for="(api, index) in apiConfig.urls" :key="index" class="api-item">
+          <div class="api-info">
+            <strong>{{ api.name }}</strong>
+            <span class="api-url">{{ api.url }}</span>
+          </div>
+          <div class="api-actions">
+            <button 
+              class="api-select-button"
+              :class="{ 'active': index === apiConfig.active_index }"
+              @click="setActiveApi(index)"
+            >
+              {{ index === apiConfig.active_index ? '当前使用' : '使用' }}
+            </button>
+            <button 
+              class="api-delete-button" 
+              @click="removeApi(index)"
+              :disabled="apiConfig.urls.length <= 1"
+            >
+              删除
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="add-api-form">
+        <h4>添加新API</h4>
+        <div class="form-group">
+          <label for="apiName">名称:</label>
+          <input 
+            id="apiName" 
+            type="text" 
+            v-model="newApiName" 
+            placeholder="API名称"
+          />
+        </div>
+        <div class="form-group">
+          <label for="apiUrl">URL:</label>
+          <input 
+            id="apiUrl" 
+            type="text" 
+            v-model="newApiUrl" 
+            placeholder="API地址"
+          />
+        </div>
+        <button @click="addNewApi" class="add-button">添加API</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">
       <p>加载社区表情库...</p>
-    </div>
-
-    <div v-else-if="error" class="error">
-      <p>{{ error }}</p>
-      <button @click="loadCommunityManifest">重试</button>
     </div>
 
     <div v-else-if="communityManifest" class="community-content">
@@ -155,6 +316,11 @@ onMounted(() => {
         <p>
           <strong>最后更新时间:</strong> 
           {{ formatDate(communityManifest.community_info.timestamp) }}
+        </p>
+        <p v-if="apiConfig.urls.length > 0">
+          <strong>当前使用API:</strong> 
+          {{ apiConfig.active_index < apiConfig.urls.length ? 
+              apiConfig.urls[apiConfig.active_index].name : '默认' }}
         </p>
       </div>
 
@@ -219,22 +385,35 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
-.refresh-button {
+.header-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.refresh-button, .api-button {
   padding: 0.5rem 1rem;
-  background-color: #4a8fe7;
-  color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
-.refresh-button:hover:not(:disabled) {
-  background-color: #3a7fd7;
+.refresh-button {
+  background-color: #4a8fe7;
+  color: white;
 }
 
-.refresh-button:disabled {
-  background-color: #a0bfe4;
+.api-button {
+  background-color: #6c5ce7;
+  color: white;
+}
+
+.refresh-button:hover:not(:disabled), .api-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.refresh-button:disabled, .api-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -249,6 +428,111 @@ onMounted(() => {
 
 .error {
   color: #f44336;
+  background-color: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.api-manager {
+  background-color: #f5f5f5;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e0e0e0;
+}
+
+.api-list {
+  margin: 1rem 0;
+}
+
+.api-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  border: 1px solid #e0e0e0;
+}
+
+.api-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.api-url {
+  display: block;
+  color: #666;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.api-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.api-select-button, .api-delete-button, .add-button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.api-select-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+.api-select-button.active {
+  background-color: #2e7d32;
+}
+
+.api-delete-button {
+  background-color: #f44336;
+  color: white;
+}
+
+.api-delete-button:disabled {
+  background-color: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+.add-api-form {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.form-group {
+  margin-bottom: 0.75rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.add-button {
+  background-color: #4a8fe7;
+  color: white;
+  margin-top: 0.5rem;
 }
 
 .community-info {
