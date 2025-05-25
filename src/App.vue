@@ -37,8 +37,8 @@ window.addEventListener('error', (event) => {
 
 // Handle meme selection
 onMounted(() => {
-  window.addEventListener('meme-selected', ((event: CustomEvent) => {
-    // selectedMeme.value = event.detail;
+  window.addEventListener('meme-selected', (() => {
+      // selectedMeme.value = event.detail;
   }) as EventListener);
   
   // 监听快捷键注册失败事件
