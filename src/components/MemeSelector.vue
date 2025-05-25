@@ -21,15 +21,34 @@ const preferences = ref<UserPreferences>({
 });
 // 添加选中表情的状态
 const selectedMeme = ref<MemeItem | null>(null);
+// 添加启用的表情库状态
+const enabledLibsCount = ref(0);
+const checkingLibs = ref(false);
 
 // Load user preferences
 onMounted(async () => {
   try {
     preferences.value = await invoke('get_user_preferences');
+    // 检查启用的表情库数量
+    await checkEnabledLibs();
   } catch (error) {
     console.error('Failed to load preferences:', error);
   }
 });
+
+// 检查已启用的表情库数量
+const checkEnabledLibs = async () => {
+  checkingLibs.value = true;
+  try {
+    const enabledLibs = await invoke<string[]>('get_enabled_meme_libs');
+    enabledLibsCount.value = enabledLibs.length;
+  } catch (error) {
+    console.error('Failed to check enabled meme libs:', error);
+    enabledLibsCount.value = 0;
+  } finally {
+    checkingLibs.value = false;
+  }
+};
 
 // 监听selectedMeme变化，3秒后自动清除
 watch(selectedMeme, (val) => {
@@ -40,9 +59,16 @@ watch(selectedMeme, (val) => {
   }
 });
 
-// 改进搜索函数，增加错误恢复机制
+// 改进搜索函数，增加表情库检查和错误恢复机制
 const searchMemes = async () => {
   if (!searchText.value.trim()) return;
+  
+  // 检查是否有启用的表情库
+  await checkEnabledLibs();
+  if (enabledLibsCount.value === 0) {
+    errorMessage.value = "请先在「表情包社区」中启用至少一个表情库后再进行搜索";
+    return;
+  }
   
   isLoading.value = true;
   errorMessage.value = '';
@@ -187,6 +213,19 @@ const toggleClipboard = async () => {
       </button>
     </div>
     
+    <!-- 添加表情库状态提示 -->
+    <div v-if="!checkingLibs" class="libs-status">
+      <div v-if="enabledLibsCount === 0" class="warning-message">
+        ⚠️ 当前未启用任何表情库，请前往「表情包社区」启用表情库后再搜索
+      </div>
+      <div v-else class="info-message">
+        ✅ 已启用 {{ enabledLibsCount }} 个表情库
+      </div>
+    </div>
+    <div v-else class="libs-status">
+      <div class="info-message">正在检查表情库状态...</div>
+    </div>
+    
     <div class="preferences">
       <label>
         <input 
@@ -219,6 +258,7 @@ const toggleClipboard = async () => {
     <div class="instructions">
       <h3>使用说明：</h3>
       <ol>
+        <li>确保在「表情包社区」中启用了至少一个表情库</li>
         <li>在搜索框中输入关键词并按下回车</li>
         <li>浏览表情搜索结果</li>
         <li>按数字键（1-9）选择表情</li>
@@ -261,6 +301,29 @@ const toggleClipboard = async () => {
 
 .search-container button:disabled {
   background-color: #a0b8d8;
+}
+
+/* 添加表情库状态样式 */
+.libs-status {
+  margin-bottom: 1rem;
+}
+
+.warning-message {
+  color: #ff6b00;
+  background-color: #fff3e0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  border-left: 4px solid #ff6b00;
+  font-weight: 500;
+}
+
+.info-message {
+  color: #4caf50;
+  background-color: #f1f8e9;
+  padding: 0.75rem;
+  border-radius: 4px;
+  border-left: 4px solid #4caf50;
+  font-weight: 500;
 }
 
 .preferences {
