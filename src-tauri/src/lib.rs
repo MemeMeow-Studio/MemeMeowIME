@@ -307,6 +307,7 @@ pub fn run() {
             add_api_url,
             remove_api_url,
             set_active_api_url,
+            meme_community::get_api_server_urls_config,
             meme_community::fetch_community_manifest,
             meme_community::refresh_community_manifest,
             meme_community::get_enabled_meme_libs,

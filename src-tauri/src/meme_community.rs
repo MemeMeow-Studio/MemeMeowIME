@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use tauri_plugin_http::reqwest;
 use tauri_plugin_http::reqwest::{Client, Error, Method, Request, RequestBuilder, StatusCode};
 
+
 use crate::utils::network::download_with_fallback_urls;
+use crate::utils::misc::{ApiUrl, ApiServerUrlsConfig};
 
 // 定义manifest.json的数据结构
 #[derive(Debug, Serialize, Deserialize)]
@@ -301,4 +303,38 @@ pub async fn refresh_community_manifest() -> Result<CommunityManifest, String> {
     info!("接收到刷新社区表情库清单请求");
     // 强制从网络刷新
     download_community_manifest().await
+}
+
+#[tauri::command]
+pub async fn get_api_server_urls_config() -> Result<Vec<ApiUrl>, String> {
+    // 获取当前配置的API服务器URL列表
+    const SERVER_URLS: [&str; 1] = [
+        "https://github.com/MemeMeow-Studio/Memes-Community/raw/main/community_server_urls.json",
+        ];
+    
+    let community_server_urls = match download_with_fallback_urls(SERVER_URLS).await {
+        Ok(text) => {
+            debug!("下载社区表情库清单成功");
+            text
+        }
+        Err(e) => {
+            error!("下载社区表情库清单失败: {}", e);
+            return Err(format!("下载失败: {}", e));
+        }
+    };
+
+    let manifest: Vec<ApiUrl> = match serde_json::from_str::<HashMap<String, String>>(&community_server_urls) {
+        Ok(data) => {
+            data.into_iter()
+                .map(|(name, url)| ApiUrl { name, url })
+                .collect()
+        },
+        Err(e) => {
+            error!("解析社区表情库清单JSON失败: {}", e);
+            return Err(format!("解析JSON失败: {}", e));
+        }
+    };
+
+    Ok(manifest)
+
 }

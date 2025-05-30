@@ -48,6 +48,9 @@ const apiConfig = ref<ApiUrlConfig>({
   urls: [{ name: "默认API", url: "https://mememeow.morami.icu" }],
   active_index: 0
 });
+const apiServerConfig = ref<ApiUrl[]>(
+  [{ name: "默认API", url: "https://mememeow.morami.icu" }]
+);
 const showApiManager = ref(false);
 const newApiName = ref("");
 const newApiUrl = ref("");
@@ -73,6 +76,17 @@ const loadApiConfig = async () => {
     error.value = `加载API配置失败: ${err}`;
   }
 };
+// 加载API Server的所有可能API
+const loadApiServerConfig = async () => {
+  try {
+    var config = await invoke<ApiUrl[]>('get_api_server_urls_config');
+    // console.log('加载API Server urls:', config);
+    apiServerConfig.value = config;
+  } catch (err) {
+    console.error('加载API Server urls失败:', err);
+    error.value = `加载API Server urls失败: ${err}`;
+  }
+};
 
 // 保存API配置
 // const saveApiConfig = async () => {
@@ -87,21 +101,31 @@ const loadApiConfig = async () => {
 //   }
 // };
 
+const addNewApi = async (name: string, url: string) => {
+  if (!name || !url) {
+    error.value = "API名称和地址不能为空";
+    return;
+  }
+  
+  try {
+    await invoke('add_api_url', { name, url });
+    // 重新加载配置
+    await loadApiConfig();
+  } catch (err) {
+    console.error('添加API失败:', err);
+    error.value = `添加API失败: ${err}`;
+  }
+};
+
 // 添加新API
-const addNewApi = async () => {
+const addNewApiFromInput = async () => {
   if (!newApiName.value || !newApiUrl.value) {
     error.value = "API名称和地址不能为空";
     return;
   }
   
   try {
-    await invoke('add_api_url', { 
-      name: newApiName.value, 
-      url: newApiUrl.value 
-    });
-    
-    // 重新加载配置
-    await loadApiConfig();
+    addNewApi(newApiName.value, newApiUrl.value);
     
     // 清空输入
     newApiName.value = "";
@@ -224,6 +248,7 @@ const toggleApiManager = () => {
 
 onMounted(() => {
   loadCommunityManifest();
+  loadApiServerConfig();
   loadApiConfig();
 });
 </script>
@@ -303,9 +328,27 @@ onMounted(() => {
             placeholder="API地址"
           />
         </div>
-        <button @click="addNewApi" class="add-button">添加API</button>
+        <button @click="addNewApiFromInput" class="add-button">添加API</button>
       </div>
+
+      <div class="api-list">
+        <h4>可用社区API列表</h4>
+        <div v-for="(api, index) in apiServerConfig" :key="index" class="api-item">
+          <div class="api-info">
+            <strong>{{ api.name }}</strong>
+            <span class="api-url">{{ api.url }}</span>
+          </div>
+          <div class="api-server-actions">
+            <button
+            @click="addNewApi(api.name, api.url)" class="add-api-from-server-button">添加到配置
+          </button>
+          </div>
+        </div>
+      </div>
+      
     </div>
+
+    
 
     <div v-if="loading" class="loading">
       <p>加载社区表情库...</p>
@@ -484,7 +527,15 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
-.api-select-button {
+.add-api-from-server-button{
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.api-select-button, .add-api-from-server-button {
   background-color: #4caf50;
   color: white;
 }
